@@ -1,0 +1,37 @@
+# All secrets / user-private files live OUTSIDE this directory:
+#   ~/.config/discord-cli/channels.yaml   (private channel/guild registry)
+#   ~/.local/state/discord-cli/token.json (cached auth token, mode 600)
+#   ~/.local/state/discord-cli/chrome-profile/
+#
+# The rules below guard against any future drift (e.g. someone running tests
+# inside this dir, or accidentally copying a config file in).
+
+# Token cache & locks
+*token*.json
+*token*.lock
+bot_token*
+*.token
+
+# Real channel/author registry — only channels.example.yaml ships
+channels.yaml
+channels.local.*
+
+# Output dumps / temp data
+*.dump.json
+out/
+.cache/
+
+# Legacy / archived modules
+_legacy/
+_archive/
+
+# Python build artifacts
+__pycache__/
+*.pyc
+*.pyo
+
+# Editor / tool metadata
+.omc/
+.DS_Store
+.idea/
+.vscode/

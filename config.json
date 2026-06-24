@@ -1,0 +1,37 @@
+{
+  "name": "discord",
+  "description": "Minimal Discord read CLI — fetch channel history and server-wide search via REST API. Five subcommands: fetch / search / channels / status / setup.",
+  "version": "3.1.0",
+  "tags": ["discord", "chat", "search", "read"],
+  "command": "discord {args}",
+  "examples": [
+    {
+      "description": "Pull past 2 days from a configured channel alias",
+      "command": "discord fetch <channel-alias> --days 2 --out /tmp/dc.json"
+    },
+    {
+      "description": "Filter by an author alias (substring match)",
+      "command": "discord fetch <channel-alias> --hours 8 --author <author-alias>"
+    },
+    {
+      "description": "Server-wide message search inside one guild",
+      "command": "discord search <guild-alias> \"QUERY\" --days 7"
+    },
+    {
+      "description": "Pass raw IDs directly when you don't want to configure aliases",
+      "command": "discord fetch 1234567890123456789 --hours 6"
+    },
+    {
+      "description": "List configured channel / guild / author aliases",
+      "command": "discord channels"
+    },
+    {
+      "description": "Check that the CDP endpoint is reachable",
+      "command": "discord status"
+    },
+    {
+      "description": "Launch Chrome with CDP enabled (first-time / token refresh)",
+      "command": "discord setup"
+    }
+  ]
+}

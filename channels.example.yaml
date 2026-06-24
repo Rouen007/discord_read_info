@@ -1,0 +1,40 @@
+# discord-cli — friendly-name registry (SAMPLE)
+#
+# Copy this to ~/.config/discord-cli/channels.yaml and fill in your own
+# guild / channel / author IDs. The real file should be mode 600 and is
+# never tracked by this skill.
+#
+#   cp channels.example.yaml ~/.config/discord-cli/channels.yaml
+#   chmod 600 ~/.config/discord-cli/channels.yaml
+#
+# Names are case-insensitive. Anything that doesn't match an alias is treated
+# as a raw Discord snowflake ID, so existing scripts using numeric IDs keep
+# working.
+
+guilds:
+  # alias:           # used on the CLI
+  #   id: "..."      # numeric Discord guild snowflake
+  #   label: "..."   # human label, shown by `discord channels`
+  example-guild:
+    id: "000000000000000000"
+    label: "Example Guild"
+
+channels:
+  # alias:
+  #   id: "..."         # numeric Discord channel snowflake
+  #   guild: <alias>    # optional, pairs the channel to a guild alias above
+  #   label: "..."      # human label
+  general:
+    id: "000000000000000000"
+    guild: example-guild
+    label: "#general"
+  trading:
+    id: "000000000000000000"
+    guild: example-guild
+    label: "#trading"
+
+# Optional: short author aliases for `discord fetch --author <alias>`.
+# Each value is a list of substrings matched (case-insensitive) against
+# author.username / author.global_name. The alias itself is always included.
+author_aliases:
+  # myfriend: ["realusername", "Display Name"]
