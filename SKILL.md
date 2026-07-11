@@ -1,8 +1,9 @@
 ---
 name: discord
-description: Minimal Discord read CLI — fetch channel history and server-wide search via REST API. Four subcommands, no DOM scraping.
-version: 3.1.0
-tags: [discord, chat, search, read]
+description: Minimal Discord read CLI — REST-first Discord reading for channel history and server-wide search, with Chrome/CDP setup only for token refresh. Use before browser/OpenCLI/DOM scraping for read-only Discord research.
+metadata:
+  version: 3.2.0
+  tags: [discord, chat, search, read]
 ---
 
 # Discord Skill
@@ -14,6 +15,27 @@ once from a logged-in Discord page on Chrome (via CDP) and cached at
 Friendly channel/guild/author aliases live in
 `~/.config/discord-cli/channels.yaml` (private, not shipped — see
 `channels.example.yaml` for the schema).
+
+## Default Agent Workflow
+
+For read-only Discord work, use this REST CLI before browser, OpenCLI, DOM
+scraping, Discord Desktop CDP, or MCP. Browser/UI routes are fallback only when:
+
+- the REST API fails or lacks the needed channel/search surface;
+- the alias registry is missing and raw IDs are not available;
+- the task depends on UI-only state that is not returned by REST.
+
+When reporting results, include:
+
+- command family used (`fetch` or `search`);
+- channel/guild alias or raw ID, plus any author/channel filters;
+- output path and message count when `--out` is used;
+- UTC window from message timestamps and the user-facing local time window;
+- limitations, retries, partial coverage, or REST errors.
+
+`fetch` is sorted oldest→newest. `search` is sorted newest→oldest. Some bot
+messages are embed-only and may have empty `content`; inspect
+`embeds[].title` / `embeds[].description` before saying nothing was posted.
 
 ## Commands
 
@@ -52,6 +74,9 @@ After the token is cached, Chrome can be closed. The token survives until you lo
 out or Discord rotates it. On 401, the cache is auto-invalidated; rerun
 `discord setup` and one `fetch` to refresh.
 
+The CLI may try a stale cached token before forcing CDP extraction. If the token
+is actually expired, the REST request returns 401 and the cache is cleared.
+
 ## Examples
 
 ```bash
@@ -81,6 +106,9 @@ Both `fetch` and `search` emit a JSON array of normalized messages:
     "author": { "id": "...", "username": "...", "global_name": "..." },
     "content": "...",
     "attachments": ["screenshot.png"],            // optional
+    "embeds": [                                   // optional, for embed-only bot posts
+      { "title": "...", "description": "..." }
+    ],
     "referenced_message": {                       // optional, for replies
       "author": "...", "content": "first 200 chars..."
     }
@@ -137,3 +165,5 @@ User-private (NOT inside this skill, not in git):
 | HTTP 401 | Token expired — rerun `discord setup` + one `fetch` to refresh |
 | HTTP 429 | CLI honors `retry_after` automatically |
 | `unknown channel 'foo'` | Add `foo` to `channels.yaml` or pass a numeric ID |
+| Empty `content` on bot messages | Inspect `embeds[].description`; many summaries are embed-only |
+| Intermittent EOF / closed connection | Retry with a smaller `--hours` window or switch from wide `fetch` to targeted `search` |

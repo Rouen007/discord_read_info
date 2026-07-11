@@ -76,6 +76,23 @@ def _read_token_cache_unlocked():
     return None
 
 
+def _read_any_token_cache_unlocked():
+    """Read a cached token regardless of age.
+
+    Discord tokens often remain valid beyond the local refresh TTL. Prefer trying
+    a stale cached token over forcing CDP extraction, then let REST 401 invalidate
+    the cache if the token is actually expired.
+    """
+    try:
+        if os.path.exists(TOKEN_CACHE_PATH):
+            with open(TOKEN_CACHE_PATH) as fh:
+                data = json.load(fh)
+            return data.get("token")
+    except Exception:
+        pass
+    return None
+
+
 def _load_token_cache():
     with _TokenLock(exclusive=False):
         return _read_token_cache_unlocked()
@@ -186,6 +203,11 @@ def get_token():
     if cached:
         return cached
 
+    with _TokenLock(exclusive=False):
+        stale_cached = _read_any_token_cache_unlocked()
+        if stale_cached:
+            return stale_cached
+
     with _TokenLock(exclusive=True):
         cached = _read_token_cache_unlocked()  # double-check after lock acquired
         if cached:
@@ -234,6 +256,12 @@ def _normalize(m: dict) -> dict:
     atts = m.get("attachments") or []
     if atts:
         out["attachments"] = [a.get("filename") for a in atts if isinstance(a, dict)]
+    embeds = m.get("embeds") or []
+    if embeds:
+        out["embeds"] = [
+            {"title": e.get("title"), "description": e.get("description")}
+            for e in embeds if isinstance(e, dict)
+        ]
     ref = m.get("referenced_message")
     if ref:
         ref_author = ref.get("author") or {}

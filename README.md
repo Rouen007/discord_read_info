@@ -14,6 +14,22 @@ No DOM scraping, no opencli dependency, no Discord Desktop required. Token is
 extracted once via Chrome DevTools Protocol from a logged-in discord.com tab,
 then cached locally so subsequent calls are pure REST.
 
+## Agent read standard
+
+For read-only Discord research, use this CLI first:
+
+1. `discord channels` to confirm aliases, or pass raw Discord IDs.
+2. `discord fetch <channel> --hours N --out /tmp/name.json` for channel history.
+3. `discord search <guild> "QUERY" --days N --max N --out /tmp/name.json` for targeted pulls.
+4. Report the output path, message count, UTC window, local-time window, filters, and any limitations.
+
+Use browser/OpenCLI/DOM scraping only as a fallback when REST cannot cover the
+task. If a wide `fetch` fails with an EOF/closed connection, retry with a smaller
+time window or use targeted `search`.
+
+Bot summaries can be embed-only: `content` may be empty while
+`embeds[].description` contains the useful text.
+
 ## Install
 
 ```bash
@@ -72,6 +88,26 @@ fcntl-locked, multi-process safe). Chrome can be closed; future calls don't need
 
 When the token expires (401 from the REST API), the cache auto-invalidates;
 `discord setup` + one fetch refreshes it.
+
+The CLI may attempt a stale cached token before CDP extraction. If it is truly
+expired, REST 401 clears the cache.
+
+## Output schema
+
+Both `fetch` and `search` return normalized JSON messages:
+
+```jsonc
+{
+  "id": "...",
+  "channel_id": "...",
+  "timestamp": "2026-06-23T19:45:12.345000+00:00",
+  "author": { "id": "...", "username": "...", "global_name": "..." },
+  "content": "...",
+  "attachments": ["screenshot.png"],
+  "embeds": [{ "title": "...", "description": "..." }],
+  "referenced_message": { "author": "...", "content": "first 200 chars..." }
+}
+```
 
 ## Multi-agent parallelism
 

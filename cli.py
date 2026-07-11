@@ -13,11 +13,11 @@ Four commands, all REST-based once token is cached. No DOM scraping, no opencli.
       Server-wide message search via Discord's REST search endpoint.
 
   discord status
-      Is Discord Desktop reachable on the CDP port?
+      Is the configured Chrome/CDP endpoint reachable?
 
   discord setup
-      Kill + relaunch Discord with --remote-debugging-port=9232, wait for ready.
-      Only needed when the cached auth token expires.
+      Launch Chrome with --remote-debugging-port and open discord.com.
+      Only needed for first login or when the cached auth token expires.
 
 Token cache:  ~/.local/state/discord-cli/token.json  (mode 600, fcntl-locked).
               Multi-process safe — multiple agents may call concurrently.

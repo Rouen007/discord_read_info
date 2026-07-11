@@ -3,6 +3,9 @@
 Minimal Discord read CLI. See `SKILL.md` for the full reference and
 `channels.example.yaml` for the config schema.
 
+Default to this REST CLI for read-only Discord work. Browser/OpenCLI/DOM
+scraping is fallback only when REST cannot cover the task.
+
 ## TL;DR
 
 ```bash
@@ -21,11 +24,17 @@ to see what's currently configured.
 
 ```jsonc
 { "id", "channel_id", "timestamp", "author": { "id", "username", "global_name" },
-  "content", "attachments"?, "referenced_message"? }
+  "content", "attachments"?, "embeds"?, "referenced_message"? }
 ```
 
 `timestamp` is UTC ISO 8601 — always convert to whatever local zone the user
 expects before showing.
+
+If a bot message has empty `content`, inspect `embeds[].description`; many
+summary bots publish their useful text only inside embeds.
+
+When reporting a read, include the output path, message count, UTC window,
+local-time window, filters, and any partial coverage.
 
 ## Persistence
 
