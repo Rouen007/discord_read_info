@@ -24,14 +24,15 @@ to see what's currently configured.
 
 ```jsonc
 { "id", "channel_id", "timestamp", "author": { "id", "username", "global_name" },
-  "content", "attachments"?, "embeds"?, "referenced_message"? }
+  "content", "attachments"?, "embeds"?: [{ "title", "description" }], "referenced_message"? }
 ```
+
+Bot channels that post as rich embeds (AlphaAgent, UW Live Options Flow, etc.) have
+empty `content` — the actual message text is in `embeds[].description`. Always check
+both fields when parsing bot output.
 
 `timestamp` is UTC ISO 8601 — always convert to whatever local zone the user
 expects before showing.
-
-If a bot message has empty `content`, inspect `embeds[].description`; many
-summary bots publish their useful text only inside embeds.
 
 When reporting a read, include the output path, message count, UTC window,
 local-time window, filters, and any partial coverage.

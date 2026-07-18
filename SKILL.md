@@ -2,7 +2,7 @@
 name: discord
 description: Minimal Discord read CLI — REST-first Discord reading for channel history and server-wide search, with Chrome/CDP setup only for token refresh. Use before browser/OpenCLI/DOM scraping for read-only Discord research.
 metadata:
-  version: 3.2.0
+  version: 3.3.0
   tags: [discord, chat, search, read]
 ---
 
@@ -118,6 +118,11 @@ Both `fetch` and `search` emit a JSON array of normalized messages:
 
 `fetch` is sorted oldest→newest; `search` is newest→oldest (Discord's native order).
 
+When `--out` is set, `fetch` writes progress to disk after every page (atomic
+temp+rename). A page-level transport failure retries automatically up to 4
+times; if it still fails, whatever pages were already fetched are on disk at
+`--out` rather than lost.
+
 ## Time zone
 
 Timestamps are UTC. Convert before showing the user:
@@ -166,4 +171,4 @@ User-private (NOT inside this skill, not in git):
 | HTTP 429 | CLI honors `retry_after` automatically |
 | `unknown channel 'foo'` | Add `foo` to `channels.yaml` or pass a numeric ID |
 | Empty `content` on bot messages | Inspect `embeds[].description`; many summaries are embed-only |
-| Intermittent EOF / closed connection | Retry with a smaller `--hours` window or switch from wide `fetch` to targeted `search` |
+| Intermittent EOF / closed connection | Auto-retried (4 attempts); if it still fails, rerun `fetch` with `--out` set to resume from the partial file |

@@ -251,10 +251,19 @@ def cmd_fetch(a) -> int:
     except Exception as e:
         print(f'{{"error":"get_token failed: {e}"}}', file=sys.stderr)
         return 1
+    def checkpoint(partial_msgs: list) -> None:
+        if not a.out:
+            return
+        tmp_path = f"{a.out}.partial"
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            json.dump(partial_msgs, f, ensure_ascii=False, indent=2)
+        os.replace(tmp_path, a.out)
+
     try:
-        msgs = discord_api.fetch_messages(channel_id, token, cutoff)
+        msgs = discord_api.fetch_messages(channel_id, token, cutoff, on_page=checkpoint)
     except Exception as e:
-        print(f'{{"error":"fetch failed: {e}"}}', file=sys.stderr)
+        suffix = f'; partial data saved to {a.out}' if a.out and os.path.exists(a.out) else ''
+        print(f'{{"error":"fetch failed: {e}{suffix}"}}', file=sys.stderr)
         return 1
     if a.author:
         needles = _resolve_author(a.author, cfg)

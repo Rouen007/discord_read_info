@@ -283,25 +283,36 @@ def _headers(token: str) -> dict:
     }
 
 
-def _request_json(url: str, token: str):
+def _request_json(url: str, token: str, attempts: int = 4):
+    """Fetch one Discord REST page, retrying transient transport failures.
+
+    High-volume channels require many pages. Discord occasionally closes a TLS
+    connection mid-read; retrying the same cursor is safe and avoids throwing
+    away an otherwise healthy multi-page fetch.
+    """
     req = urllib.request.Request(url, headers=_headers(token))
-    try:
-        resp = urllib.request.urlopen(req, timeout=15)
-    except urllib.error.HTTPError as e:
-        body = e.read().decode("utf-8", errors="replace")
-        if e.code == 401:
-            invalidate_token()
-        if e.code == 429:
-            # Caller can catch + retry; surface the retry_after.
-            try:
-                ra = json.loads(body).get("retry_after", 1.0)
-            except Exception:
-                ra = 1.0
-            raise _RateLimited(ra, body)
-        raise RuntimeError(f"HTTP {e.code}: {body[:300]}")
-    except Exception as e:
-        raise RuntimeError(f"Request failed: {e}")
-    return json.loads(resp.read())
+    last_error = None
+    for attempt in range(attempts):
+        try:
+            resp = urllib.request.urlopen(req, timeout=15)
+            return json.loads(resp.read())
+        except urllib.error.HTTPError as e:
+            body = e.read().decode("utf-8", errors="replace")
+            if e.code == 401:
+                invalidate_token()
+            if e.code == 429:
+                # Caller can catch + retry; surface the retry_after.
+                try:
+                    ra = json.loads(body).get("retry_after", 1.0)
+                except Exception:
+                    ra = 1.0
+                raise _RateLimited(ra, body)
+            raise RuntimeError(f"HTTP {e.code}: {body[:300]}")
+        except Exception as e:
+            last_error = e
+            if attempt + 1 < attempts:
+                time.sleep(0.75 * (attempt + 1))
+    raise RuntimeError(f"Request failed after {attempts} attempts: {last_error}")
 
 
 class _RateLimited(Exception):
@@ -311,7 +322,7 @@ class _RateLimited(Exception):
         self.body = body
 
 
-def fetch_messages(channel_id, token, cutoff: datetime, limit=100):
+def fetch_messages(channel_id, token, cutoff: datetime, limit=100, on_page=None):
     """
     Fetch all messages in channel since `cutoff` (aware datetime, UTC).
     Returns list of normalized dicts, sorted chronologically.
@@ -346,6 +357,11 @@ def fetch_messages(channel_id, token, cutoff: datetime, limit=100):
                 continue
 
             all_msgs.append(_normalize(m))
+
+        # Persistable progress hook for callers: a later page failure must not
+        # discard pages already fetched from a busy channel.
+        if on_page:
+            on_page(sorted(all_msgs, key=lambda m: m["timestamp"] or ""))
 
         if reached_cutoff or len(msgs) < limit:
             break
