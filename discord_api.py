@@ -255,7 +255,17 @@ def _normalize(m: dict) -> dict:
     }
     atts = m.get("attachments") or []
     if atts:
-        out["attachments"] = [a.get("filename") for a in atts if isinstance(a, dict)]
+        out["attachments"] = [
+            {
+                "filename": a.get("filename"),
+                "url": a.get("url"),
+                "proxy_url": a.get("proxy_url"),
+                "content_type": a.get("content_type"),
+                "size": a.get("size"),
+            }
+            for a in atts
+            if isinstance(a, dict)
+        ]
     embeds = m.get("embeds") or []
     if embeds:
         out["embeds"] = [
@@ -439,6 +449,60 @@ def search_messages(
         time.sleep(0.3)
 
     return out[:max_results]
+
+
+def download_attachments(
+    messages: list[dict],
+    out_dir: str,
+    *,
+    image_only: bool = True,
+) -> list[dict]:
+    """Download attachments from normalized messages to *out_dir*.
+
+    Returns a manifest list of ``{id, timestamp, content, filename, path}``.
+    When *image_only* is True (default), only image/* content types are
+    downloaded (falls back to extension sniffing when content_type is missing).
+    """
+    IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".svg"}
+    out = Path(out_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    manifest: list[dict] = []
+    for m in messages:
+        for i, att in enumerate(m.get("attachments") or []):
+            if not isinstance(att, dict) or not att.get("url"):
+                continue
+            ct = (att.get("content_type") or "").lower()
+            fname = att.get("filename") or "file"
+            ext = Path(fname).suffix.lower()
+            if image_only:
+                if ct and not ct.startswith("image/"):
+                    continue
+                if not ct and ext not in IMAGE_EXTS:
+                    continue
+            safe_name = f"{m.get('id', 'unknown')}_{i}{ext or '.png'}"
+            dest = out / safe_name
+            url = att.get("proxy_url") or att["url"]
+            req = urllib.request.Request(url, headers={
+                "User-Agent": (
+                    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko)"
+                ),
+            })
+            try:
+                data = urllib.request.urlopen(req, timeout=30).read()
+                dest.write_bytes(data)
+                manifest.append({
+                    "id": m.get("id"),
+                    "timestamp": m.get("timestamp"),
+                    "content": (m.get("content") or "")[:200],
+                    "filename": fname,
+                    "path": str(dest),
+                })
+            except Exception as e:
+                print(f"warning: failed to download {url}: {e}", file=sys.stderr)
+    manifest_path = out / "manifest.json"
+    manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2))
+    return manifest
 
 
 # No __main__ — call this module as a library from cli.py.

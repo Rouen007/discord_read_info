@@ -1,8 +1,8 @@
 ---
 name: discord
-description: Minimal Discord read CLI — REST-first Discord reading for channel history and server-wide search, with Chrome/CDP setup only for token refresh. Use before browser/OpenCLI/DOM scraping for read-only Discord research.
+description: Minimal Discord read CLI — REST-first Discord reading for channel history, server-wide search, and image downloading, with Chrome/CDP setup only for token refresh. Use before browser/OpenCLI/DOM scraping for read-only Discord research.
 metadata:
-  version: 3.3.0
+  version: 3.4.0
   tags: [discord, chat, search, read]
 ---
 
@@ -42,6 +42,8 @@ messages are embed-only and may have empty `content`; inspect
 ```
 discord fetch    <channel>  [--days N | --hours N] [--author NAME] [--out PATH]
 discord search   <guild>    "QUERY" [--channel CH] [--author-id ID] [--days N] [--max N] [--out PATH]
+discord images   <channel>  [--days N | --hours N] [--author NAME] [--out DIR]
+                            [--all] [--from-json PATH]
 discord channels                              # show what aliases are configured
 discord status                                # is the CDP endpoint reachable?
 discord setup    [--profile DIR] [--chrome PATH]   # launch Chrome with CDP enabled
@@ -91,6 +93,15 @@ discord search myguild "QCOM" --days 7
 
 # Pass raw IDs if you don't want to configure aliases
 discord fetch 1234567890123456789 --hours 6
+
+# Download images from the past 2 days
+discord images tradingroom --days 2 --out /tmp/trading_images
+
+# Download only one author's images
+discord images tradingroom --hours 12 --author frank --out /tmp/frank_charts
+
+# Download from a previously saved fetch JSON
+discord images --from-json /tmp/dc.json --out /tmp/images
 ```
 
 ## Output schema
@@ -105,7 +116,15 @@ Both `fetch` and `search` emit a JSON array of normalized messages:
     "timestamp": "2026-06-23T19:45:12.345000+00:00",   // UTC ISO 8601
     "author": { "id": "...", "username": "...", "global_name": "..." },
     "content": "...",
-    "attachments": ["screenshot.png"],            // optional
+    "attachments": [                               // optional
+      {
+        "filename": "screenshot.png",
+        "url": "https://cdn.discordapp.com/...",
+        "proxy_url": "https://media.discordapp.net/...",
+        "content_type": "image/png",
+        "size": 123456
+      }
+    ],
     "embeds": [                                   // optional, for embed-only bot posts
       { "title": "...", "description": "..." }
     ],
@@ -117,6 +136,13 @@ Both `fetch` and `search` emit a JSON array of normalized messages:
 ```
 
 `fetch` is sorted oldest→newest; `search` is newest→oldest (Discord's native order).
+
+`images` downloads attachments to the specified directory and writes a
+`manifest.json` mapping each file back to its message id, timestamp, content,
+original filename, and local path. By default only image attachments
+(`image/*` content type or common image extensions) are downloaded; pass
+`--all` to include everything. Use `--from-json` to skip fetching and
+download from a previously saved JSON file.
 
 When `--out` is set, `fetch` writes progress to disk after every page (atomic
 temp+rename). A page-level transport failure retries automatically up to 4
@@ -148,7 +174,7 @@ Multiple agents can call `discord fetch` / `discord search` concurrently.
 
 ```
 cli.py                  # CLI entry (symlinked from ~/.local/bin/discord)
-discord_api.py          # token cache + REST helpers
+discord_api.py          # token cache + REST helpers + attachment downloader
 channels.example.yaml   # sample config — copy to ~/.config/discord-cli/channels.yaml
 README.md               # install / upload notes
 ```

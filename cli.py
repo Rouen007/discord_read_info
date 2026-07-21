@@ -2,7 +2,7 @@
 """
 discord — minimal Discord read CLI.
 
-Four commands, all REST-based once token is cached. No DOM scraping, no opencli.
+Five commands, all REST-based once token is cached. No DOM scraping, no opencli.
 
   discord fetch  <channel_id> [--days N | --hours N] [--author NAME] [--out PATH]
       Pull channel history via Discord REST API. --author filters client-side
@@ -11,6 +11,12 @@ Four commands, all REST-based once token is cached. No DOM scraping, no opencli.
   discord search <guild_id> "QUERY" [--channel CH] [--author-id ID] [--days N]
                                     [--max N] [--out PATH]
       Server-wide message search via Discord's REST search endpoint.
+
+  discord images <channel_id> [--days N | --hours N] [--author NAME] [--out DIR]
+                              [--all] [--from-json PATH]
+      Download image attachments from channel history to a local directory.
+      --all includes non-image files. --from-json skips fetching and reads
+      from a previously saved JSON file.
 
   discord status
       Is the configured Chrome/CDP endpoint reachable?
@@ -316,6 +322,51 @@ def cmd_channels(_a) -> int:
     return 0
 
 
+def cmd_images(a) -> int:
+    """Download image attachments from channel history."""
+    import discord_api
+
+    # Load messages: either from a previously saved JSON or by fetching live.
+    if a.from_json:
+        try:
+            with open(a.from_json, "r", encoding="utf-8") as f:
+                msgs = json.load(f)
+            print(f"loaded {len(msgs)} messages from {a.from_json}", file=sys.stderr)
+        except Exception as e:
+            print(f'{{"error":"failed to read {a.from_json}: {e}"}}', file=sys.stderr)
+            return 1
+    else:
+        if not a.channel_id:
+            print('{"error":"channel_id is required unless --from-json is given"}', file=sys.stderr)
+            return 1
+        cfg = _load_config()
+        channel_id = _resolve_channel(a.channel_id, cfg)
+        cutoff = _cutoff_from(a.days, a.hours)
+        try:
+            token = discord_api.get_token()
+        except Exception as e:
+            print(f'{{"error":"get_token failed: {e}"}}', file=sys.stderr)
+            return 1
+        try:
+            msgs = discord_api.fetch_messages(channel_id, token, cutoff)
+        except Exception as e:
+            print(f'{{"error":"fetch failed: {e}"}}', file=sys.stderr)
+            return 1
+        if a.author:
+            cfg = _load_config()
+            needles = _resolve_author(a.author, cfg)
+            msgs = [m for m in msgs if _matches_author(m, needles)]
+
+    out_dir = a.out or f"/tmp/discord_images_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}"
+    manifest = discord_api.download_attachments(msgs, out_dir, image_only=not a.all)
+    print(json.dumps({
+        "downloaded": len(manifest),
+        "directory": out_dir,
+        "manifest": f"{out_dir}/manifest.json",
+    }, indent=2))
+    return 0
+
+
 # ── argparse wiring ──────────────────────────────────────────────────────────
 
 
@@ -341,6 +392,17 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--max", type=int, default=1000, help="max results (default 1000)")
     sp.add_argument("--out")
     sp.set_defaults(handler=cmd_search)
+
+    sp = sub.add_parser("images", help="download image attachments from channel history")
+    sp.add_argument("channel_id", nargs="?", default=None, help="channel alias or numeric id (not needed with --from-json)")
+    g = sp.add_mutually_exclusive_group()
+    g.add_argument("--days", type=float)
+    g.add_argument("--hours", type=float)
+    sp.add_argument("--author", help="filter by author (substring, case-insensitive)")
+    sp.add_argument("--out", help="output directory for downloaded images")
+    sp.add_argument("--all", action="store_true", help="download all attachments, not just images")
+    sp.add_argument("--from-json", dest="from_json", help="read messages from a previously saved JSON file instead of fetching")
+    sp.set_defaults(handler=cmd_images)
 
     sub.add_parser("channels", help="list configured channel/guild/author aliases").set_defaults(handler=cmd_channels)
 

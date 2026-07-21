@@ -1,10 +1,12 @@
 # discord — minimal Discord read CLI
 
-Four-command CLI for pulling Discord messages via the official REST API:
+Five-command CLI for pulling Discord messages via the official REST API:
 
 ```
 discord fetch    <channel>  [--days N | --hours N] [--author NAME] [--out PATH]
 discord search   <guild>    "QUERY" [--channel CH] [--author-id ID] [--days N] [--max N]
+discord images   <channel>  [--days N | --hours N] [--author NAME] [--out DIR]
+                            [--all] [--from-json PATH]
 discord channels                     # list configured aliases
 discord status                       # is the CDP endpoint reachable?
 discord setup                        # launch Chrome with --remote-debugging-port
@@ -103,10 +105,52 @@ Both `fetch` and `search` return normalized JSON messages:
   "timestamp": "2026-06-23T19:45:12.345000+00:00",
   "author": { "id": "...", "username": "...", "global_name": "..." },
   "content": "...",
-  "attachments": ["screenshot.png"],
+  "attachments": [
+    {
+      "filename": "screenshot.png",
+      "url": "https://cdn.discordapp.com/...",
+      "proxy_url": "https://media.discordapp.net/...",
+      "content_type": "image/png",
+      "size": 123456
+    }
+  ],
   "embeds": [{ "title": "...", "description": "..." }],
   "referenced_message": { "author": "...", "content": "first 200 chars..." }
 }
+```
+
+## Downloading images
+
+The `images` subcommand downloads image attachments from channel history to a
+local directory:
+
+```bash
+# Download images from the past 2 days
+discord images tradingroom --days 2 --out /tmp/trading_images
+
+# Download only one author's images
+discord images tradingroom --hours 12 --author frank --out /tmp/frank_charts
+
+# Download ALL attachments (not just images)
+discord images tradingroom --days 1 --all --out /tmp/all_files
+
+# Download from a previously saved fetch JSON
+discord fetch tradingroom --days 3 --out /tmp/msgs.json
+discord images --from-json /tmp/msgs.json --out /tmp/images
+```
+
+Each download produces a `manifest.json` in the output directory:
+
+```jsonc
+[
+  {
+    "id": "1527316900328116314",
+    "timestamp": "2026-07-17T14:30:00.000000+00:00",
+    "content": "today's chart",
+    "filename": "screenshot.png",
+    "path": "/tmp/trading_images/1527316900328116314_0.png"
+  }
+]
 ```
 
 ## Multi-agent parallelism
